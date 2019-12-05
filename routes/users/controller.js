@@ -1,4 +1,10 @@
-const { Users } = require('../../models')
+const { Users } = require('../../models'),
+    {
+        comparePassword,
+        hashPassword
+    } = require('../../helpers'),
+    { JWT_SECRET_KEY } = require('../../config'),
+    jwt = require('jsonwebtoken')
 
 module.exports = {
     getAll: async (req, res) => {
@@ -21,17 +27,30 @@ module.exports = {
                 .find({
                     email: req.body.email
                 })
-                .then(result => {
+                .then(async result => {
                     if (result.length > 0) {
-                        let item = result.find(item => {
-                            return item.password === req.body.password
-                        })
+                        let firstName = result[0].firstName,
+                            lastName = result[0].lastName,
+                            password = result[0].password,
+                            id = result[0].id
 
-                        if (item != null) {
+                        const decision = await comparePassword(req.body.password, password)
+
+                        if (decision) {
+                            const token = await jwt.sign(
+                                {
+                                    id,
+                                    firstName,
+                                    lastName
+                                },
+                                JWT_SECRET_KEY,
+                                {
+                                    expiresIn: '1d'
+                                }
+                            )
+
                             res.send({
-                                id: item.id,
-                                firstName: item.firstName,
-                                lastName: item.lastName
+                                token
                             })
                         } else {
                             res.send({
@@ -88,7 +107,7 @@ module.exports = {
                 .find({
                     email: req.body.email
                 })
-                .then(result1 => {
+                .then(async result1 => {
                     if (result1.length > 0) {
                         res.send({
                             message: 'Email have been used!'
@@ -98,6 +117,8 @@ module.exports = {
                     }
 
                     try {
+                        let password = await hashPassword(req.body.password)
+
                         Users
                             .find({})
                             .then(result2 => {
@@ -108,7 +129,7 @@ module.exports = {
                                             firstName: req.body.firstName,
                                             lastName: req.body.lastName,
                                             email: req.body.email,
-                                            password: req.body.password
+                                            password: password
                                         })
                                         .then(result3 => {
                                             res.send({
